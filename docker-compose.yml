@@ -1,0 +1,227 @@
+version: '3.9'
+
+services:
+  # ==========================================
+  # PostgreSQL Database
+  # ==========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: pbl-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docs/database-schema.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - pbl-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Redis Cache
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: pbl-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - pbl-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # MinIO (S3-compatible storage)
+  # ==========================================
+  minio:
+    image: minio/minio:latest
+    container_name: pbl-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    ports:
+      - "${MINIO_PORT}:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - pbl-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ==========================================
+  # API Gateway (Node.js + TypeScript)
+  # ==========================================
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: pbl-api-gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${API_GATEWAY_PORT}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      OBSIDIAN_SYNC_URL: ${OBSIDIAN_SYNC_URL}
+      FLASHCARD_ENGINE_URL: ${FLASHCARD_ENGINE_URL}
+      AI_SERVICE_URL: ${AI_SERVICE_URL}
+    ports:
+      - "${API_GATEWAY_PORT}:${API_GATEWAY_PORT}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pbl-network
+    volumes:
+      - ./backend/api-gateway/src:/app/src
+
+  # ==========================================
+  # Obsidian Sync Service (Node.js + TypeScript)
+  # ==========================================
+  obsidian-sync:
+    build:
+      context: ./backend/obsidian-sync
+      dockerfile: Dockerfile
+    container_name: pbl-obsidian-sync
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${OBSIDIAN_SYNC_PORT}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      OBSIDIAN_VAULT_PATH: ${OBSIDIAN_VAULT_PATH}
+    ports:
+      - "${OBSIDIAN_SYNC_PORT}:${OBSIDIAN_SYNC_PORT}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pbl-network
+    volumes:
+      - ./backend/obsidian-sync/src:/app/src
+
+  # ==========================================
+  # Flashcard Engine (Node.js + TypeScript)
+  # ==========================================
+  flashcard-engine:
+    build:
+      context: ./backend/flashcard-engine
+      dockerfile: Dockerfile
+    container_name: pbl-flashcard-engine
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${FLASHCARD_ENGINE_PORT}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      DEFAULT_ALGORITHM: ${DEFAULT_ALGORITHM}
+    ports:
+      - "${FLASHCARD_ENGINE_PORT}:${FLASHCARD_ENGINE_PORT}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pbl-network
+    volumes:
+      - ./backend/flashcard-engine/src:/app/src
+
+  # ==========================================
+  # AI Service (Python)
+  # ==========================================
+  ai-service:
+    build:
+      context: ./backend/ai-service
+      dockerfile: Dockerfile
+    container_name: pbl-ai-service
+    restart: unless-stopped
+    environment:
+      PORT: ${AI_SERVICE_PORT}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${AI_SERVICE_PORT}:${AI_SERVICE_PORT}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pbl-network
+    volumes:
+      - ./backend/ai-service:/app
+
+  # ==========================================
+  # Frontend (Next.js)
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pbl-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "${FRONTEND_PORT}:3000"
+    depends_on:
+      - api-gateway
+    networks:
+      - pbl-network
+    volumes:
+      - ./frontend/app:/app/app
+      - ./frontend/components:/app/components
+
+networks:
+  pbl-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
