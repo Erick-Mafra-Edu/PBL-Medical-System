@@ -14,13 +14,14 @@ router.post('/generate', authenticate, async (req: AuthRequest, res) => {
     const userId = req.userId;
 
     if (!content) {
-      return res.status(400).json({
+      res.status(400).json({
         error: {
           statusCode: 400,
           message: 'Content is required',
           code: 'VALIDATION_ERROR'
         }
       });
+      return;
     }
 
     logger.info('Generating flashcards', { userId, courseId, count });
@@ -97,7 +98,7 @@ router.post('/:id/review', authenticate, async (req: AuthRequest, res) => {
     const userId = req.userId;
 
     if (quality === undefined || quality < 0 || quality > 5) {
-      return res.status(400).json({
+      res.status(400).json({
         error: {
           statusCode: 400,
           message: 'Quality must be between 0 and 5',

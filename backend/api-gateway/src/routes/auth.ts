@@ -5,22 +5,31 @@ import db from '../config/database';
 import { logger } from '../config/logger';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_ALGORITHM = 'HS256';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'pbl-medical-system';
+const JWT_ISSUER = process.env.JWT_ISSUER || 'pbl-auth-service';
+
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  logger.error('JWT_SECRET is not set or too weak. Must be at least 32 characters.');
+  throw new Error('JWT_SECRET must be set in environment variables and be at least 32 characters long');
+}
 
 // POST /api/auth/register - Register new user
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password, name } = req.body;
 
     if (!email || !password || !name) {
-      return res.status(400).json({
+      res.status(400).json({
         error: {
           statusCode: 400,
           message: 'Email, password, and name are required',
           code: 'VALIDATION_ERROR'
         }
       });
+      return;
     }
 
     // Check if user already exists
@@ -29,14 +38,15 @@ router.post('/register', async (req: Request, res: Response) => {
       [email]
     );
 
-    if (existingUser.rowCount > 0) {
-      return res.status(409).json({
+    if (existingUser.rowCount && existingUser.rowCount > 0) {
+      res.status(409).json({
         error: {
           statusCode: 409,
           message: 'User already exists',
           code: 'CONFLICT'
         }
       });
+      return;
     }
 
     // Hash password
@@ -52,10 +62,18 @@ router.post('/register', async (req: Request, res: Response) => {
 
     const user = result.rows[0];
 
-    // Generate token
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN
-    });
+    // Generate token with security options
+    const token = jwt.sign(
+      { userId: user.id },
+      JWT_SECRET!,
+      {
+        expiresIn: JWT_EXPIRES_IN,
+        algorithm: JWT_ALGORITHM as any,
+        audience: JWT_AUDIENCE,
+        issuer: JWT_ISSUER,
+        subject: user.id
+      } as any
+    );
 
     logger.info('User registered', { userId: user.id, email });
 
@@ -82,18 +100,19 @@ router.post('/register', async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/login - Login user
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({
+      res.status(400).json({
         error: {
           statusCode: 400,
           message: 'Email and password are required',
           code: 'VALIDATION_ERROR'
         }
       });
+      return;
     }
 
     // Find user
@@ -103,13 +122,14 @@ router.post('/login', async (req: Request, res: Response) => {
     );
 
     if (result.rowCount === 0) {
-      return res.status(401).json({
+      res.status(401).json({
         error: {
           statusCode: 401,
           message: 'Invalid credentials',
           code: 'UNAUTHORIZED'
         }
       });
+      return;
     }
 
     const user = result.rows[0];
@@ -118,13 +138,14 @@ router.post('/login', async (req: Request, res: Response) => {
     const validPassword = await bcrypt.compare(password, user.password_hash);
 
     if (!validPassword) {
-      return res.status(401).json({
+      res.status(401).json({
         error: {
           statusCode: 401,
           message: 'Invalid credentials',
           code: 'UNAUTHORIZED'
         }
       });
+      return;
     }
 
     // Update last login
@@ -133,10 +154,18 @@ router.post('/login', async (req: Request, res: Response) => {
       [user.id]
     );
 
-    // Generate token
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN
-    });
+    // Generate token with security options
+    const token = jwt.sign(
+      { userId: user.id },
+      JWT_SECRET!,
+      {
+        expiresIn: JWT_EXPIRES_IN,
+        algorithm: JWT_ALGORITHM as any,
+        audience: JWT_AUDIENCE,
+        issuer: JWT_ISSUER,
+        subject: user.id
+      } as any
+    );
 
     logger.info('User logged in', { userId: user.id, email });
 
@@ -159,6 +188,6 @@ router.post('/login', async (req: Request, res: Response) => {
       }
     });
   }
-});
+});;
 
 export default router;

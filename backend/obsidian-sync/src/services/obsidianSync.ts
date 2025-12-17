@@ -59,7 +59,7 @@ export class ObsidianSyncService {
         [userId, note.filePath]
       );
 
-      if (existing.rowCount > 0) {
+      if (existing.rowCount && existing.rowCount > 0) {
         // Update existing note
         await db.query(
           `UPDATE notes 

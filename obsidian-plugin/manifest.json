@@ -1,0 +1,11 @@
+{
+  "id": "pbl-obsidian-sync-client",
+  "name": "PBL Obsidian Sync Client",
+  "version": "0.1.0",
+  "minAppVersion": "0.15.0",
+  "description": "Envie seu vault para o serviço obsidian-sync (sync e watch).",
+  "author": "PBL Medical System",
+  "authorUrl": "https://github.com/Erick-Mafra-Edu/pbl-medical-system",
+  "isDesktopOnly": true,
+  "js": "main.js"
+}

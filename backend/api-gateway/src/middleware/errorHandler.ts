@@ -5,8 +5,8 @@ export function errorHandler(
   err: any,
   req: Request,
   res: Response,
-  next: NextFunction
-) {
+  _next: NextFunction
+): void {
   logger.error('Error occurred', {
     error: err.message,
     stack: err.stack,
@@ -22,8 +22,7 @@ export function errorHandler(
     error: {
       statusCode,
       message,
-      code,
-      ...(err.details && { details: err.details })
+      code
     }
   });
 }

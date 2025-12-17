@@ -38,13 +38,14 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
     const { name, description, color, icon } = req.body;
 
     if (!name) {
-      return res.status(400).json({
+      res.status(400).json({
         error: {
           statusCode: 400,
           message: 'Course name is required',
           code: 'VALIDATION_ERROR'
         }
       });
+      return;
     }
 
     const result = await db.query(
@@ -81,7 +82,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({
+      res.status(404).json({
         error: {
           statusCode: 404,
           message: 'Course not found',
