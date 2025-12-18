@@ -1,7 +1,7 @@
 🛠️ Global Development Workflow Rules
 Post-Task Requirements:
 
-Documentation: Every task must generate a technical documentation file in /docs/.
+Documentation: Every task must generate a technical documentation file in /PBL Docs/.
 
 Commit Message: Create a descriptive commit message in English following Conventional Commits (e.g., feat:, fix:, refactor:).
 
@@ -13,7 +13,7 @@ Simulate the merge into the dev branch upon completion.
 
 Markdown Documentation Standards (Obsidian Optimized):
 
-Path: Always save in /docs/.
+Path: Always save in /PBL Docs/.
 
 Frontmatter: Include YAML block with tags, created, and type.
 

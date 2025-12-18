@@ -180,6 +180,11 @@
       "bases:Create new base": false
     }
   },
-  "active": "09a07bd3e24d9c79",
-  "lastOpenFiles": []
+  "active": "35d4a91cc7b4326e",
+  "lastOpenFiles": [
+    "SETUP.md",
+    "JWT_SECURITY_IMPLEMENTATION.md",
+    "JWT_SECURITY.md",
+    "ARCHITECTURE.md"
+  ]
 }
