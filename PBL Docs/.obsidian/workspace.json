@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "ARCHITECTURE.md",
+                "file": "CI-CD Pipeline.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "ARCHITECTURE"
+              "title": "CI-CD Pipeline"
             }
           }
         ]
@@ -182,9 +182,24 @@
   },
   "active": "35d4a91cc7b4326e",
   "lastOpenFiles": [
+    "README.md",
+    "Quick Reference Guide.md",
+    "Project Complete Summary.md",
+    "INDEX.md",
+    "Deployment Guide.md",
+    "Database Schema.md",
     "SETUP.md",
+    "Web Scraper Implementation.md",
+    "CI-CD Pipeline.md",
+    "Storage Service.md",
+    "Obsidian Sync Utilities.md",
+    "API Design.md",
+    "ARCHITECTURE.md",
+    "Architecture Overview.md",
+    "Testing Guide.md",
+    "Validation Report.md",
+    "Implementation Summary.md",
     "JWT_SECURITY_IMPLEMENTATION.md",
-    "JWT_SECURITY.md",
-    "ARCHITECTURE.md"
+    "JWT_SECURITY.md"
   ]
 }
