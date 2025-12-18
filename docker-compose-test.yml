@@ -1,0 +1,197 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database for testing
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: pbl-postgres-test
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-pbl_test}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pbl-test-network
+
+  # Redis for caching/sessions (test)
+  redis-test:
+    image: redis:7-alpine
+    container_name: pbl-redis-test
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pbl-test-network
+
+  # MinIO for S3-compatible storage (test)
+  minio-test:
+    image: minio/minio:latest
+    container_name: pbl-minio-test
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+    volumes:
+      - minio-test-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - pbl-test-network
+
+  # API Gateway Service (Test)
+  api-gateway-test:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: pbl-api-gateway-test
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-test:5432/${DB_NAME:-pbl_test}
+      REDIS_URL: redis://redis-test:6379
+      JWT_SECRET: ${JWT_SECRET:-test-secret-key-change-in-production}
+      PORT: 3000
+      LOG_LEVEL: debug
+      MINIO_ENDPOINT: http://minio-test:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-pbl-medical-system}
+      STORAGE_ENDPOINT: http://minio-test:9000
+      STORAGE_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      STORAGE_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      STORAGE_BUCKET: ${MINIO_BUCKET:-pbl-medical-system}
+    ports:
+      - "3001:3000"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+      minio-test:
+        condition: service_healthy
+    volumes:
+      - ./backend/api-gateway/src:/app/src
+    networks:
+      - pbl-test-network
+    command: npm run test || npm run start
+
+  # Flashcard Engine Service (Test)
+  flashcard-engine-test:
+    build:
+      context: ./backend/flashcard-engine
+      dockerfile: Dockerfile
+    container_name: pbl-flashcard-engine-test
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-test:5432/${DB_NAME:-pbl_test}
+      REDIS_URL: redis://redis-test:6379
+      PORT: 3002
+      LOG_LEVEL: debug
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    volumes:
+      - ./backend/flashcard-engine/src:/app/src
+    networks:
+      - pbl-test-network
+    command: npm run test || npm run start
+
+  # Obsidian Sync Service (Test)
+  obsidian-sync-test:
+    build:
+      context: ./backend/obsidian-sync
+      dockerfile: Dockerfile
+    container_name: pbl-obsidian-sync-test
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-test:5432/${DB_NAME:-pbl_test}
+      REDIS_URL: redis://redis-test:6379
+      PORT: 3003
+      LOG_LEVEL: debug
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    volumes:
+      - ./backend/obsidian-sync/src:/app/src
+    networks:
+      - pbl-test-network
+    command: npm run test || npm run start
+
+  # AI Service (Test)
+  ai-service-test:
+    build:
+      context: ./backend/ai-service
+      dockerfile: Dockerfile
+    container_name: pbl-ai-service-test
+    environment:
+      PYTHONUNBUFFERED: 1
+      LOG_LEVEL: DEBUG
+      PORT: 8000
+      REDIS_URL: redis://redis-test:6379
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-test:5432/${DB_NAME:-pbl_test}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-test-key}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-test-key}
+    ports:
+      - "8001:8000"
+    depends_on:
+      redis-test:
+        condition: service_healthy
+    volumes:
+      - ./backend/ai-service/services:/app/services
+    networks:
+      - pbl-test-network
+    command: pytest . -v --tb=short || python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend Service (Test)
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: pbl-frontend-test
+    environment:
+      NEXT_PUBLIC_API_URL: http://api-gateway-test:3000
+      NODE_ENV: test
+    ports:
+      - "3010:3000"
+    depends_on:
+      - api-gateway-test
+    volumes:
+      - ./frontend/app:/app/app
+      - ./frontend/components:/app/components
+    networks:
+      - pbl-test-network
+    command: npm run test || npm run dev
+
+volumes:
+  postgres-test-data:
+  minio-test-data:
+
+networks:
+  pbl-test-network:
+    driver: bridge
