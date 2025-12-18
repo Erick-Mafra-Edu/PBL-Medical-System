@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import db from '../config/database';
+import prisma from '../config/prisma';
 import { logger } from '../config/logger';
 
 const router = Router();
@@ -33,12 +33,11 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     }
 
     // Check if user already exists
-    const existingUser = await db.query(
-      'SELECT id FROM users WHERE email = $1',
-      [email]
-    );
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
 
-    if (existingUser.rowCount && existingUser.rowCount > 0) {
+    if (existingUser) {
       res.status(409).json({
         error: {
           statusCode: 409,
@@ -52,15 +51,20 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user
-    const result = await db.query(
-      `INSERT INTO users (email, password_hash, name)
-       VALUES ($1, $2, $3)
-       RETURNING id, email, name, created_at`,
-      [email, passwordHash, name]
-    );
-
-    const user = result.rows[0];
+    // Create user using Prisma
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        name,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+      }
+    });
 
     // Generate token with security options
     const token = jwt.sign(
@@ -82,7 +86,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
         id: user.id,
         email: user.email,
         name: user.name,
-        createdAt: user.created_at
+        createdAt: user.createdAt
       },
       token,
       expiresIn: JWT_EXPIRES_IN
@@ -115,13 +119,18 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Find user
-    const result = await db.query(
-      'SELECT id, email, name, password_hash FROM users WHERE email = $1',
-      [email]
-    );
+    // Find user using Prisma
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        passwordHash: true,
+      }
+    });
 
-    if (result.rowCount === 0) {
+    if (!user) {
       res.status(401).json({
         error: {
           statusCode: 401,
@@ -132,10 +141,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const user = result.rows[0];
-
     // Verify password
-    const validPassword = await bcrypt.compare(password, user.password_hash);
+    const validPassword = await bcrypt.compare(password, user.passwordHash);
 
     if (!validPassword) {
       res.status(401).json({
@@ -147,12 +154,11 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       });
       return;
     }
-
-    // Update last login
-    await db.query(
-      'UPDATE users SET last_login = NOW() WHERE id = $1',
-      [user.id]
-    );
+    // Update last login using Prisma
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() }
+    });
 
     // Generate token with security options
     const token = jwt.sign(
@@ -188,6 +194,111 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       }
     });
   }
-});;
+});
+
+// GET /api/auth/profile - Get current user profile
+router.get('/profile', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Assuming userId is set by auth middleware
+    const userId = (req as any).userId;
+
+    if (!userId) {
+      res.status(401).json({
+        error: {
+          statusCode: 401,
+          message: 'Unauthorized',
+          code: 'UNAUTHORIZED'
+        }
+      });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        avatar: true,
+        preferences: true,
+        createdAt: true,
+        updatedAt: true,
+        lastLogin: true,
+      }
+    });
+
+    if (!user) {
+      res.status(404).json({
+        error: {
+          statusCode: 404,
+          message: 'User not found',
+          code: 'NOT_FOUND'
+        }
+      });
+      return;
+    }
+
+    res.json({ user });
+  } catch (error: any) {
+    logger.error('Profile fetch failed', { error: error.message });
+    res.status(500).json({
+      error: {
+        statusCode: 500,
+        message: 'Failed to fetch profile',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+});
+
+// PUT /api/auth/profile - Update user profile
+router.put('/profile', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).userId;
+    const { name, avatar, preferences } = req.body;
+
+    if (!userId) {
+      res.status(401).json({
+        error: {
+          statusCode: 401,
+          message: 'Unauthorized',
+          code: 'UNAUTHORIZED'
+        }
+      });
+      return;
+    }
+
+    const updateData: any = {};
+    if (name) updateData.name = name;
+    if (avatar) updateData.avatar = avatar;
+    if (preferences) updateData.preferences = preferences;
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        avatar: true,
+        preferences: true,
+        updatedAt: true,
+      }
+    });
+
+    logger.info('User profile updated', { userId });
+
+    res.json({ user });
+  } catch (error: any) {
+    logger.error('Profile update failed', { error: error.message });
+    res.status(500).json({
+      error: {
+        statusCode: 500,
+        message: 'Failed to update profile',
+        code: 'INTERNAL_ERROR'
+      }
+    });
+  }
+});
 
 export default router;

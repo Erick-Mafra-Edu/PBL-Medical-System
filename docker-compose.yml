@@ -80,18 +80,27 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV}
       PORT: ${API_GATEWAY_PORT}
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      DB_HOST: postgres
+      DB_PORT: 5432
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
+      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
-      OBSIDIAN_SYNC_URL: ${OBSIDIAN_SYNC_URL}
-      FLASHCARD_ENGINE_URL: ${FLASHCARD_ENGINE_URL}
-      AI_SERVICE_URL: ${AI_SERVICE_URL}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-pbl-medical-system}
+      JWT_ISSUER: ${JWT_ISSUER:-pbl-auth-service}
+      OBSIDIAN_SYNC_URL: http://obsidian-sync:3001
+      FLASHCARD_ENGINE_URL: http://flashcard-engine:3002
+      AI_SERVICE_URL: http://ai-service:8000
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_REGION: ${MINIO_REGION}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
     ports:
       - "${API_GATEWAY_PORT}:${API_GATEWAY_PORT}"
     depends_on:
@@ -103,6 +112,11 @@ services:
       - pbl-network
     volumes:
       - ./backend/api-gateway/src:/app/src
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${API_GATEWAY_PORT}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ==========================================
   # Obsidian Sync Service (Node.js + TypeScript)

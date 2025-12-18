@@ -1,0 +1,238 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// Enums
+// ==========================================
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum SourceType {
+  OBSIDIAN
+  NOTION
+  MANUAL
+  UPLOAD
+}
+
+enum FlashcardState {
+  NEW
+  LEARNING
+  REVIEW
+  RELEARNING
+}
+
+// ==========================================
+// User Model
+// ==========================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  passwordHash String  @map("password_hash")
+  name      String
+  avatar    String?
+
+  // Preferences stored as JSON
+  preferences Json @default("{\"defaultAlgorithm\":\"sm2\",\"dailyGoal\":20,\"notificationsEnabled\":true,\"theme\":\"auto\"}")
+
+  // Relations
+  courses       Course[]
+  notes         Note[]
+  flashcards    Flashcard[]
+  files         File[]
+  studySessions StudySession[]
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  lastLogin DateTime? @map("last_login")
+
+  @@map("users")
+}
+
+// ==========================================
+// Course Model
+// ==========================================
+
+model Course {
+  id          String @id @default(uuid())
+  userId      String @map("user_id")
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String @default("")
+  color       String @default("#3B82F6")
+  icon        String @default("📚")
+
+  // Stats
+  totalFlashcards Int @default(0) @map("total_flashcards")
+  totalNotes      Int @default(0) @map("total_notes")
+  totalStudyTime  Int @default(0) @map("total_study_time") // minutes
+
+  // Relations
+  notes         Note[]
+  flashcards    Flashcard[]
+  files         File[]
+  studySessions StudySession[]
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("courses")
+}
+
+// ==========================================
+// Note Model
+// ==========================================
+
+model Note {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  courseId  String?  @map("course_id")
+  course    Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  title     String   @db.VarChar(500)
+  content   String
+  tags      String[] @default([])
+
+  // Source tracking
+  sourceType SourceType? @map("source_type")
+  sourceId   String?     @map("source_id") // File path for Obsidian, page ID for Notion
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  syncedAt  DateTime? @map("synced_at")
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([sourceId])
+  @@map("notes")
+}
+
+// ==========================================
+// Flashcard Model
+// ==========================================
+
+model Flashcard {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  courseId  String?  @map("course_id")
+  course    Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  question  String   @db.Text
+  answer    String   @db.Text
+  tags      String[] @default([])
+  difficulty Difficulty @default(MEDIUM)
+
+  // Spaced Repetition fields (SM2 Algorithm)
+  interval      Int       @default(0) @map("interval") // days until next review
+  repetition    Int       @default(0) @map("repetition") // number of times reviewed
+  easeFactor    Decimal   @default(2.50) @db.Decimal(3, 2) @map("ease_factor") // SM2 ease factor
+  nextReview    DateTime  @default(now()) @map("next_review")
+  lastReviewed  DateTime? @map("last_reviewed")
+
+  // FSRS Algorithm fields (optional, for advanced algorithm)
+  stability     Decimal?  @db.Decimal(5, 2) // FSRS stability
+  fsrsDifficulty Decimal? @db.Decimal(4, 2) @map("fsrs_difficulty") // FSRS difficulty
+  scheduledDays Int?      @map("scheduled_days") // Days until next review
+  state         FlashcardState? @map("state") // Card state for FSRS
+
+  // Relations
+  reviews       FlashcardReview[]
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([nextReview])
+  @@map("flashcards")
+}
+
+// ==========================================
+// Flashcard Review Model (History)
+// ==========================================
+
+model FlashcardReview {
+  id          String   @id @default(uuid())
+  flashcardId String   @map("flashcard_id")
+  flashcard   Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+
+  quality     Int      @db.SmallInt // 0-5 SM2 quality score
+  timeSpent   Int      @default(0) @map("time_spent") // seconds spent on review
+  reviewedAt  DateTime @default(now()) @map("reviewed_at")
+
+  @@index([flashcardId])
+  @@index([reviewedAt])
+  @@map("flashcard_reviews")
+}
+
+// ==========================================
+// Study Session Model
+// ==========================================
+
+model StudySession {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  courseId    String?  @map("course_id")
+  course      Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  cardsReviewed Int    @default(0) @map("cards_reviewed")
+  timeSpent     Int    @default(0) @map("time_spent") // minutes
+  startedAt     DateTime @default(now()) @map("started_at")
+  endedAt       DateTime? @map("ended_at")
+
+  @@index([userId])
+  @@index([courseId])
+  @@map("study_sessions")
+}
+
+// ==========================================
+// File Model (PDFs, PowerPoints, etc.)
+// ==========================================
+
+model File {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  courseId    String?  @map("course_id")
+  course      Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  filename    String   @db.VarChar(500)
+  fileType    String   @db.VarChar(50) // pdf, pptx, docx, etc.
+  fileSize    BigInt   @map("file_size") // bytes
+  storagePath String   @map("storage_path") // Path in MinIO/S3
+
+  // Metadata
+  uploadedAt    DateTime @default(now()) @map("uploaded_at")
+  processed     Boolean  @default(false) // Has OCR/extraction been done?
+  extractedText String?  @map("extracted_text") @db.Text
+
+  @@index([userId])
+  @@index([courseId])
+  @@map("files")
+}
