@@ -139,3 +139,7 @@ Inclua:
 Use JSDoc para TypeScript, docstrings para Python.
 
 📝 Regra Adicional: Documentação TécnicaSempre que eu gerar arquivos de documentação em Markdown (.md):Localização: Devem ser salvos invariavelmente no diretório /docs/.Otimização para Obsidian:Utilizar Wikilinks [[Nome do Arquivo]] para referências cruzadas entre documentos.Incluir um bloco de Frontmatter (YAML) no topo com tags, created e type.Utilizar Callouts do Obsidian (> [!INFO], > [!WARNING], etc.) para notas importantes.Garantir uma estrutura de headers clara para facilitar o modo "Outline".Resumo do Fluxo de Trabalho IntegradoTarefaTecnologiasPadrões AplicadosProvedores de IAPython (Pydantic, Logging)Interface AIProvider, Factory Pattern.Algoritmos FlashcardTypeScript (Jest, LaTeX)Interface FlashcardAlgorithm, Factory Pattern.Adapters de SyncTypeScript (Axios/Fetch)Interface SyncAdapter, Factory Pattern.Testes UnitáriosPytest / JestMocks, 80%+ Coverage, Happy/Error paths.DocumentaçãoMarkdown (.md)Armazenamento em /docs/, Formato Obsidian.
+
+Sempre ao terminar uma tarefa crie um commit message descritivo em inglês que siga estas diretrizes:
+e faça uma documentação sobre a tarefa realizada seguindo as regras acima.
+crie uma branch da tarefa e faça o merge com a branch dev.
