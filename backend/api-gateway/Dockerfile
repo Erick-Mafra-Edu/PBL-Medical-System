@@ -15,7 +15,7 @@ RUN npm ci
 COPY prisma ./prisma
 
 # Generate Prisma Client
-RUN npm run prisma:generate
+RUN DATABASE_URL="postgresql://user:password@localhost:5432/dbname" npm run prisma:generate
 
 # Copy scripts
 COPY scripts ./scripts
@@ -37,7 +37,10 @@ USER nodejs
 # Expose port
 EXPOSE 3000
 
+# Added default DATABASE_URL for Prisma during Docker build
+ENV DATABASE_URL="postgresql://user:password@localhost:5432/dbname"
+
 # Use dumb-init to handle signals properly
-ENTRYPOINT ["/sbin/dumb-init", "--"]
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 # Run entrypoint script which handles migrations
 CMD ["/app/scripts/entrypoint.sh", "npm", "start"]

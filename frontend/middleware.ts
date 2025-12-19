@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from './auth'
+import { getToken } from 'next-auth/jwt'
 
 // List of protected routes that require authentication
 const protectedRoutes = [
@@ -12,15 +12,19 @@ const protectedRoutes = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Get the session token using JWT (Edge Runtime compatible)
+  const token = await getToken({ 
+    req: request, 
+    secret: process.env.NEXTAUTH_SECRET 
+  })
+
   // Check if the route is protected
   const isProtected = protectedRoutes.some((route) =>
     pathname.startsWith(route)
   )
 
   if (isProtected) {
-    const session = await auth()
-
-    if (!session?.user) {
+    if (!token) {
       // Redirect to login if not authenticated
       const loginUrl = new URL('/auth/login', request.url)
       loginUrl.searchParams.set('callbackUrl', pathname)
@@ -30,9 +34,7 @@ export async function middleware(request: NextRequest) {
 
   // Allow auth pages to be accessed by unauthenticated users
   if (pathname.startsWith('/auth')) {
-    const session = await auth()
-
-    if (session?.user && (pathname === '/auth/login' || pathname === '/auth/register')) {
+    if (token && (pathname === '/auth/login' || pathname === '/auth/register')) {
       // Redirect authenticated users to dashboard
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }

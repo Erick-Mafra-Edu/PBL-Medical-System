@@ -279,14 +279,14 @@ model Review {
 
 ### Quality Scale
 
-| Score | Meaning | Action |
-|-------|---------|--------|
-| 0 | Complete blackout | Reset interval to 0 |
-| 1 | Incorrect response | Reset interval to 0 |
-| 2 | Correct with difficulty | Reset interval to 0 |
-| 3 | Correct with much effort | Normal progression |
-| 4 | Correct with little effort | Normal progression |
-| 5 | Perfect response | Normal progression |
+| Score | Meaning                    | Action              |
+| ----- | -------------------------- | ------------------- |
+| 0     | Complete blackout          | Reset interval to 0 |
+| 1     | Incorrect response         | Reset interval to 0 |
+| 2     | Correct with difficulty    | Reset interval to 0 |
+| 3     | Correct with much effort   | Normal progression  |
+| 4     | Correct with little effort | Normal progression  |
+| 5     | Perfect response           | Normal progression  |
 
 ---
 

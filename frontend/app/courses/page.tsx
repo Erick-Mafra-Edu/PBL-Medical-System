@@ -37,8 +37,6 @@ export default function CoursesPage() {
     }
   }
 
-
-
   async function handleDelete(courseId: string) {
     try {
       setError(null);
@@ -111,6 +109,7 @@ export default function CoursesPage() {
             </div>
           </div>
         ))}
+      </div>
     </div>
   );
 }

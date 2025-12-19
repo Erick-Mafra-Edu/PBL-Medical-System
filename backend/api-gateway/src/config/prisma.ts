@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-import { logger } from './logger';
 
 let prisma: PrismaClient;
 
@@ -8,61 +7,16 @@ declare global {
 }
 
 if (process.env.NODE_ENV === 'production') {
-  prisma = new PrismaClient({
-    log: [
-      {
-        emit: 'event',
-        level: 'error',
-      },
-      {
-        emit: 'event',
-        level: 'warn',
-      },
-    ],
-  });
+  prisma = new PrismaClient();
 } else {
   if (!global.prisma) {
-    global.prisma = new PrismaClient({
-      log: [
-        {
-          emit: 'event',
-          level: 'query',
-        },
-        {
-          emit: 'event',
-          level: 'error',
-        },
-        {
-          emit: 'event',
-          level: 'warn',
-        },
-      ],
-    });
+    global.prisma = new PrismaClient();
   }
   prisma = global.prisma;
 }
 
-// Log events
-prisma.$on('query', (e: any) => {
-  logger.debug('Database Query', {
-    query: e.query,
-    params: e.params,
-    duration: `${e.duration}ms`,
-  });
-});
-
-prisma.$on('error', (e: any) => {
-  logger.error('Database Error', {
-    message: e.message,
-    code: e.code,
-  });
-});
-
-prisma.$on('warn', (e: any) => {
-  logger.warn('Database Warning', {
-    message: e.message,
-  });
-});
+// Log events handlers removed for TypeScript compatibility
+// Event listeners can be added when needed using the Prisma event emitter API
 
 // Handle shutdown gracefully
 process.on('SIGINT', async () => {

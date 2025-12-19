@@ -1,11 +1,10 @@
-import NextAuth from 'next-auth'
-import Credentials from 'next-auth/providers/credentials'
+import { CredentialsProvider } from 'next-auth/providers/credentials'
 import { apiClient } from '@/lib/api'
 import { API_CONFIG } from '@/lib/apiConfig'
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const authOptions = {
   providers: [
-    Credentials({
+    CredentialsProvider({
       name: 'Credentials',
       credentials: {
         email: { label: 'Email', type: 'email', placeholder: 'user@example.com' },
@@ -17,14 +16,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         try {
-          // Call backend API to authenticate
           const response = await apiClient.post(API_CONFIG.ENDPOINTS.AUTH_LOGIN, {
             email: credentials.email,
             password: credentials.password,
           })
 
           if (response.token && response.user) {
-            // Store token for API requests
             apiClient.setToken(response.token)
 
             return {
@@ -65,4 +62,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET,
-})
+}
